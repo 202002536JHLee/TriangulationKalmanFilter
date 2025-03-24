@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>UWB Trilateration Map + Kalman Filter</title>
+  <style>
+    #mapCanvas {
+      border: 1px solid #000;
+    }
+  </style>
+  <script>
+    const canvasWidth = 800;
+    const canvasHeight = 500;
+    const physicalWidth = 11.55;
+    const physicalHeight = 5.85;
+    const desiredDrawingHeight = 300;
+    const ratio = physicalWidth / physicalHeight;
+    const desiredDrawingWidth = desiredDrawingHeight * ratio;
+    const marginX = (canvasWidth - desiredDrawingWidth) / 2;
+    const marginY = (canvasHeight - desiredDrawingHeight) / 2;
+    const scaleX = desiredDrawingWidth / physicalWidth;
+    const scaleY = desiredDrawingHeight / physicalHeight;
+    const markerRadius = 5;
+    const bgImageSrc = "{{ url_for('static', filename='test-bed.png') }}";
+    let bgImage = new Image();
+    bgImage.src = bgImageSrc;
+
+    function physicalToPixel(x, y) {
+      return {
+        x: marginX + x * scaleX,
+        y: canvasHeight - marginY - (y * scaleY)
+      };
+    }
+
+    function updateMap() {
+      fetch("/data")
+        .then(response => response.json())
+        .then(data => {
+          const canvas = document.getElementById("mapCanvas");
+          const ctx = canvas.getContext("2d");
+          ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+          ctx.drawImage(bgImage, marginX, marginY, desiredDrawingWidth, desiredDrawingHeight);
+
+          const anchorPositions = data.anchor_positions;
+          for (const [anchorId, pos] of Object.entries(anchorPositions)) {
+            const pixelPos = physicalToPixel(pos[0], pos[1]);
+            ctx.beginPath();
+            ctx.arc(pixelPos.x, pixelPos.y, markerRadius, 0, 2 * Math.PI);
+            ctx.fillStyle = "orange";
+            ctx.fill();
+            ctx.fillStyle = "black";
+            ctx.fillText(anchorId, pixelPos.x + markerRadius + 2, pixelPos.y - markerRadius - 2);
+          }
+
+          if (data.tag) {
+            const tagPixel = physicalToPixel(data.tag.x, data.tag.y);
+            ctx.beginPath();
+            ctx.arc(tagPixel.x, tagPixel.y, markerRadius, 0, 2 * Math.PI);
+            ctx.fillStyle = "blue";
+            ctx.fill();
+          }
+        })
+        .catch(error => console.error("Error fetching data:", error));
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      bgImage.onload = function() {
+        updateMap();
+        setInterval(updateMap, 1000);
+      };
+    });
+  </script>
+</head>
+<body>
+  <h1>UWB Trilateration Map + Kalman Filter 적용</h1>
+  <canvas id="mapCanvas" width="800" height="500"></canvas>
+</body>
+</html>
